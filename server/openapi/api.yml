@@ -17,6 +17,17 @@ components:
       required: true
       schema:
         type: string
+    Filters:
+      name: filters
+      in: query
+      description: List of base64-encoded regex filters to be matched against log lines.
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: false
 
 paths:
   /log/{log_id}/query:
@@ -25,6 +36,7 @@ paths:
       operationId: server.query
       parameters:
         - $ref: "#/components/parameters/LogId"
+        - $ref: '#/components/parameters/Filters'
       responses:
         200:
           description: Query a log...

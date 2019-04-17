@@ -4,13 +4,15 @@ import connexion
 from flask import Flask, jsonify
 import sqlite3
 import pathlib
+import base64
 
 
 app = Flask(__name__)
 DATA_DIR = pathlib.Path('./data')
 
 
-def query(log_id):
+def query(log_id, filters=None):
+    filters = filters or []
     path = DATA_DIR / f'{log_id}.sqlite'
     if not path.exists():
         return jsonify({'error': 'log not found'}), 404
@@ -19,7 +21,8 @@ def query(log_id):
     conn.load_extension('/usr/lib/sqlite3/pcre.so')
     cursor = conn.cursor()
 
-    filters_str = ''
+    filters_str = ' AND '.join(['line REGEXP "' + base64.b64decode(f).decode() + '"' for f in filters])
+    #filters_str = ' AND '.join([f"line REGEXP '{x}'" for x in filters])
     size = 5000
     offset = 0
 
@@ -27,6 +30,8 @@ def query(log_id):
         where_clause = 'WHERE ' + filters_str
     else:
         where_clause = ''
+
+    print(where_clause)
 
     q = f"SELECT line FROM logs {where_clause} LIMIT {size} OFFSET {offset}"
     return jsonify({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
