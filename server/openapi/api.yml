@@ -28,6 +28,26 @@ components:
           type: string
       style: form
       explode: false
+    Offset:
+      name: offset
+      in: query
+      description: Log offset.
+      example: 10000
+      required: false
+      schema:
+        type: number
+        format: int32
+        default: 0
+    Size:
+      name: size
+      in: query
+      description: Log size.
+      example: 5000
+      required: false
+      schema:
+        type: number
+        format: int32
+        default: 5000
 
 paths:
   /log/{log_id}/query:
@@ -37,6 +57,8 @@ paths:
       parameters:
         - $ref: "#/components/parameters/LogId"
         - $ref: '#/components/parameters/Filters'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Size'
       responses:
         200:
           description: Query a log...

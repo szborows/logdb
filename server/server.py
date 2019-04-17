@@ -22,7 +22,6 @@ def query(log_id, filters=None):
     cursor = conn.cursor()
 
     filters_str = ' AND '.join(['line REGEXP "' + base64.b64decode(f).decode() + '"' for f in filters])
-    #filters_str = ' AND '.join([f"line REGEXP '{x}'" for x in filters])
     size = 5000
     offset = 0
 
