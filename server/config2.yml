@@ -1,0 +1,4 @@
+node:
+  name: 'Server2'
+network:
+  bind: '127.0.0.2:8080'

@@ -9,12 +9,19 @@ import base64
 import logging
 import yaml
 import os
+import random
+import string
 
 
 app = Flask(__name__)
 DATA_DIR = pathlib.Path('./data')
-CONFIG_PATH = './config.yml'
 DEFAULT_CONFIG = {
+    'network': {
+        'bind': '127.0.0.1:8080'
+    },
+    'node': {
+        'name': ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(12)])
+    }
 }
 
 
@@ -43,20 +50,22 @@ def query(log_id, filters=None):
     return jsonify({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
 
 
-def _start(peers):
-    print('peers:', peers)
+def _start(config):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name']))
+    print('config:', config)
     app = connexion.App(__name__, specification_dir='openapi/')
     app.add_api('api.yml')
-    app.run(port=8080)
+    host, port = config['network']['bind'].split(':')
+    app.run(host=host, port=port)
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('peers', nargs='+')
+    ap.add_argument('-c', '--config', default='config.yml')
     args = ap.parse_args()
-    if os.path.isfile(CONFIG_PATH):
-        with open(CONFIG_PATH) as f:
-            config = yaml.load(f.read(), Loader=yaml.SafeLoader)
+    if os.path.isfile(args.config):
+        with open(args.config) as f:
+            config = {**DEFAULT_CONFIG, **yaml.load(f.read(), Loader=yaml.SafeLoader)}
     else:
         config = DEFAULT_CONFIG
-    _start(args.peers)
+    _start(config)
