@@ -17,3 +17,23 @@ mkdir data
 cd ../client
 ./query.py -f='CMP' example
 ```
+
+## database requirements
+
+* fastest possible query (with regex filtering, label/tag constraints, time/row-number ranges, offset and size)
+* fair indexing time
+* good distribution
+* high availability
+* failover
+
+
+## comparison with other databases
+
+| database | difference |
+| --- | --- |
+| Cassandra | |
+| LogDevice | |
+| ElasticSearch | |
+| SQL | |
+| Redis | |
+| rqlite | |

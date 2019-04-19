@@ -1,1 +1,2 @@
 connexion==2.2.0
+pyyaml==5.1
