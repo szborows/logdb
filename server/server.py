@@ -65,11 +65,11 @@ async def query(request, log_id, filters=None):
     return web.json_response({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
 
 async def dev_cluster_state(request):
+    request.app['cluster'].state().set('k', {'nk': 'v'}, sync=True)
     return web.json_response(request.app['cluster'].state().rawData())
 
 
 def _start(config):
-    global cluster
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name']))
 
     print('config:', config)
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     args = ap.parse_args()
     if os.path.isfile(args.config):
         with open(args.config) as f:
-            config = merge_dicts(yaml.load(f.read(), Loader=yaml.SafeLoader), DEFAULT_CONFIG)
+            config = merge_dicts(DEFAULT_CONFIG, yaml.load(f.read(), Loader=yaml.SafeLoader))
     else:
         config = DEFAULT_CONFIG
     _start(config)
