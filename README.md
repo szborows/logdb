@@ -6,7 +6,7 @@ Log Research Database
 
 This is both research project and a hobby project. It's not mature, it doesn't have appropriate quality and it's not production-grade!
 
-Performance and security is not of a concern too.
+Performance and security is not of a concern too. Ofc currently. The plan is to implement proper distribution and then optimize code working on a slave node.
 
 
 ## flow
@@ -31,11 +31,14 @@ cd ../client
 
 ## comparison with other databases
 
+All not-distributed databases are outside of consideration.
+
 | database | difference |
 | --- | --- |
-| Cassandra | |
-| LogDevice | |
-| ElasticSearch | |
-| SQL | |
-| Redis | |
-| rqlite | |
+| Cassandra | Oriented around high write throughput. Although querying with CQL is effective when indices are well-designed, overall reading throughput is not primary concern in Cassandra and it doesn't work well with filtering (e.g. regex). |
+| LogDevice | Based on Cassandra, so same characteristics apply. |
+| ElasticSearch | AFAIK closest solution: good distribution and flexible querying mechanisms. However, performance is lower than possible and so-called deep scrolls are expensive. |
+| PostgreSQL | Regex not part of standard. Poor distribution capabilities. |
+| Redis | In-memory, so would not support storing lot of data. |
+| rqlite | AFAIK it makes SQLite HA, so the data is duplicated on every node. -- tbd -- |
+| Presto | -- tbd -- |
