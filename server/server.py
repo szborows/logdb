@@ -11,19 +11,30 @@ import yaml
 import os
 import random
 import string
+from pysyncobj import SyncObj
+from pysyncobj.batteries import ReplCounter, ReplDict
+
+from utils import merge_dicts
+
+class Cluster:
+    def __init__(self, addr, peers):
+        self.nodes = [addr] + peers
+        self._state = ReplDict()
+        self._syncObj = SyncObj(addr, ['{0}:{1}'.format(p, config['network']['raft_port']) for p in peers] ['serverB:4321', 'serverC:4321'], consumers=[CLUSTER_STATE])
 
 
 app = Flask(__name__)
 DATA_DIR = pathlib.Path('./data')
 DEFAULT_CONFIG = {
     'network': {
-        'bind': '127.0.0.1:8080'
+        'bind': '127.0.0.1',
+        'app_port': 8080,
+        'raft_port': 4321
     },
     'node': {
         'name': ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(12)])
     }
 }
-
 
 def query(log_id, filters=None):
     filters = filters or []
@@ -55,8 +66,8 @@ def _start(config):
     print('config:', config)
     app = connexion.App(__name__, specification_dir='openapi/')
     app.add_api('api.yml')
-    host, port = config['network']['bind'].split(':')
-    app.run(host=host, port=port)
+    host = config['network']['bind']
+    app.run(host=host, port=config['network']['app_port'])
 
 
 if __name__ == '__main__':
@@ -65,7 +76,7 @@ if __name__ == '__main__':
     args = ap.parse_args()
     if os.path.isfile(args.config):
         with open(args.config) as f:
-            config = {**DEFAULT_CONFIG, **yaml.load(f.read(), Loader=yaml.SafeLoader)}
+            config = merge_dicts(yaml.load(f.read(), Loader=yaml.SafeLoader), DEFAULT_CONFIG)
     else:
         config = DEFAULT_CONFIG
     _start(config)
