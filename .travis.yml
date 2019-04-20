@@ -8,4 +8,4 @@ python:
 install:
   - pip3 install tox
 script:
-  - tox -e ut
+  - "cd server && tox -e ut"
