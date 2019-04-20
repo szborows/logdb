@@ -50,6 +50,13 @@ components:
         default: 5000
 
 paths:
+  /dev/cs:
+    get:
+      operationId: server.dev_cluster_state
+      summary: dev
+      responses:
+        200:
+          description: dev
   /log/{log_id}/query:
     get:
       summary: Query a log.

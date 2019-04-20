@@ -16,13 +16,19 @@ from pysyncobj.batteries import ReplCounter, ReplDict
 
 from utils import merge_dicts
 
+
 class Cluster:
     def __init__(self, addr, peers):
         self.nodes = [addr] + peers
         self._state = ReplDict()
-        self._syncObj = SyncObj(addr, ['{0}:{1}'.format(p, config['network']['raft_port']) for p in peers] ['serverB:4321', 'serverC:4321'], consumers=[CLUSTER_STATE])
+        raft_port = config['network']['raft_port']
+        self._syncObj = SyncObj('{0}:{1}'.format(addr, raft_port), ['{0}:{1}'.format(p, raft_port) for p in peers], consumers=[self._state])
+
+    def state(self):
+        return self._state
 
 
+cluster = None
 app = Flask(__name__)
 DATA_DIR = pathlib.Path('./data')
 DEFAULT_CONFIG = {
@@ -60,12 +66,23 @@ def query(log_id, filters=None):
     q = f"SELECT line FROM logs {where_clause} LIMIT {size} OFFSET {offset}"
     return jsonify({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
 
+def dev_cluster_state():
+    global cluster
+    logging.warning(cluster)
+    return '', 200
+
 
 def _start(config):
+    global cluster
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name']))
+
+    cluster = Cluster(config['network']['bind'], config['network']['peers'])
+    logging.warning(cluster.state())
+
     print('config:', config)
     app = connexion.App(__name__, specification_dir='openapi/')
     app.add_api('api.yml')
+
     host = config['network']['bind']
     app.run(host=host, port=config['network']['app_port'])
 
