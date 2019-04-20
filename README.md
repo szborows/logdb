@@ -1,6 +1,8 @@
 # logdb
 Log Research Database
 
+[![Build Status](https://travis-ci.com/szborows/logdb.svg?branch=master)](https://travis-ci.com/szborows/logdb)
+
 
 This is both research project and a hobby project. It's not mature, it doesn't have appropriate quality and it's not production-grade!
 
