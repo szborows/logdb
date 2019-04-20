@@ -2,6 +2,7 @@
 
 from aiohttp import web
 import argparse
+import json
 import connexion
 import sqlite3
 import pathlib
@@ -11,10 +12,16 @@ import yaml
 import os
 import random
 import string
-from pysyncobj import SyncObj
+from pysyncobj import SyncObj, SyncObjConf
 from pysyncobj.batteries import ReplCounter, ReplDict
 
 from utils import merge_dicts
+
+
+class RaftState:
+    FOLLOWER = 0
+    CANDIDATE = 1
+    LEADER = 2
 
 
 class Cluster:
@@ -22,7 +29,18 @@ class Cluster:
         self.nodes = [addr] + peers
         self._state = ReplDict()
         raft_port = config['network']['raft_port']
-        self._syncObj = SyncObj('{0}:{1}'.format(addr, raft_port), ['{0}:{1}'.format(p, raft_port) for p in peers], consumers=[self._state])
+        logging.info('initializing Raft')
+        self._syncObjConf = SyncObjConf(onStateChanged=lambda os, ns: self._stateChanged(os, ns))
+        self._syncObj = SyncObj('{0}:{1}'.format(addr, raft_port), ['{0}:{1}'.format(p, raft_port) for p in peers], consumers=[self._state], conf=self._syncObjConf)
+
+    def _stateChanged(self, oldState, newState):
+        if newState == RaftState.FOLLOWER:
+            state = 'follower'
+        elif newState == RaftState.CANDIDATE:
+            state = 'candidate'
+        else:
+            state = 'leader'
+        logging.info(f'changed Raft role to: {state}')
 
     def state(self):
         return self._state
@@ -65,8 +83,10 @@ async def query(request, log_id, filters=None):
     return web.json_response({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
 
 async def dev_cluster_state(request):
-    request.app['cluster'].state().set('k', {'nk': 'v'}, sync=True)
-    return web.json_response(request.app['cluster'].state().rawData())
+    cluster = request.app['cluster']
+    logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
+    #cluster.state().set('k', {'nk': 'v'}, sync=True)
+    return web.json_response(cluster.state().rawData())
 
 
 def _start(config):
