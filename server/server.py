@@ -178,6 +178,7 @@ async def create(request, log_id):
     return web.Response()
 
 
+@ensure_cluster_healthy
 async def query(request, log_id, filters=None):
     filters = filters or []
 
