@@ -5,3 +5,4 @@ network:
   peers:
     - '127.0.0.1'
     - '127.0.0.2'
+data_dir: ./data3

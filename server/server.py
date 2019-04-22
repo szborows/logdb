@@ -46,7 +46,6 @@ class Cluster:
         return self._state
 
 
-DATA_DIR = pathlib.Path('./data')
 DEFAULT_CONFIG = {
     'network': {
         'bind': '127.0.0.1',
@@ -55,14 +54,15 @@ DEFAULT_CONFIG = {
     },
     'node': {
         'name': ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(12)])
-    }
+    },
+    'data_dir': './data'
 }
 
 async def query(request, log_id, filters=None):
     filters = filters or []
-    path = DATA_DIR / f'{log_id}.sqlite'
+    path = request.app['data_dir'] / f'{log_id}.sqlite'
     if not path.exists():
-        return web.json_response({'error': 'log not found'}), 404
+        return web.json_response({'error': 'log not found'}, status=404)
     conn = sqlite3.connect(str(path))
     conn.enable_load_extension(True)
     conn.load_extension('/usr/lib/sqlite3/pcre.so')
@@ -77,8 +77,6 @@ async def query(request, log_id, filters=None):
     else:
         where_clause = ''
 
-    print(where_clause)
-
     q = f"SELECT line FROM logs {where_clause} LIMIT {size} OFFSET {offset}"
     return web.json_response({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
 
@@ -92,11 +90,12 @@ async def dev_cluster_state(request):
 def _start(config):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name']))
 
-    print('config:', config)
+    logging.info('config:' + json.dumps(config, indent=2))
 
     app = connexion.AioHttpApp(__name__, specification_dir='openapi/')
     api = app.add_api('api.yml', pass_context_arg_name='request')
     api.subapp['cluster'] = Cluster(config['network']['bind'], config['network']['peers'])
+    api.subapp['data_dir'] = pathlib.Path(config['data_dir'])
 
     host = config['network']['bind']
     app.run(host=host, port=config['network']['app_port'])

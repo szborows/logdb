@@ -15,7 +15,7 @@ def query(url, log, filters):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('--url', default='http://localhost:8080')
+    ap.add_argument('--url', default='http://127.0.0.1:8080')
     ap.add_argument('-f', '--filter', action='append')
     ap.add_argument('log')
     args = ap.parse_args()
