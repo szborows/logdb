@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from aiohttp import web
+import aiohttp
 import argparse
 import copy
 import json
@@ -25,7 +26,7 @@ class RaftState:
     LEADER = 2
 
 
-class Logs:
+class LocalLogs:
     def __init__(self, data_dir):
         self.logs = []
         logging.info('Finding logs on local filesystem')
@@ -48,8 +49,8 @@ class Cluster:
         self._logs = ReplDict()
         self._raft_port = config['network']['raft_port']
 
-    def set_logs(self, logs):
-        self._local_logs = logs
+    def add_logs(self, local_logs):
+        self._local_logs = local_logs
 
     def sync(self):
         logging.info('Syncing cluster state')
@@ -97,11 +98,11 @@ DEFAULT_CONFIG = {
     'data_dir': './data'
 }
 
-async def query(request, log_id, filters=None):
-    filters = filters or []
+
+async def query_local(request, log_id, filters):
     path = request.app['data_dir'] / f'{log_id}.sqlite'
     if not path.exists():
-        return web.json_response({'error': 'log not found'}, status=404)
+        return web.json_response({'error': 'data inconsistency at node'}, status=500)
     conn = sqlite3.connect(str(path))
     conn.enable_load_extension(True)
     conn.load_extension('/usr/lib/sqlite3/pcre.so')
@@ -117,7 +118,45 @@ async def query(request, log_id, filters=None):
         where_clause = ''
 
     q = f"SELECT line FROM logs {where_clause} LIMIT {size} OFFSET {offset}"
+    logging.info('Q: ' + q)
     return web.json_response({"log_lines": '\n'.join([x[0] for x in cursor.execute(q).fetchall()])})
+
+
+async def query_remote(config, cluster, log_id, filters):
+    node = cluster.state()['logs'].get(log_id)
+    if node is None:
+        return web.json_response({'error': 'log not found in cluster'}, status=404)
+    logging.info('Found node which holds requested log: ' + node)
+    # streaming HTTP could possibly be used too, but with current assumptions 1 line is up to
+    # 513 bytes, and 15k is expected number of lines fetched. that gives 7.5MB. Not too bad.
+
+    if filters:
+        filters_str = '?filters=' + ','.join(filters)
+    else:
+        filters_str = ''
+
+    try:
+        async with aiohttp.ClientSession(raise_for_status=True) as client:
+            port = config['network']['app_port']
+            url = f'http://{node}:{port}/api/v1/log/{log_id}/query{filters_str}'
+            response = await client.get(url)
+            return web.json_response(await response.json())
+    except aiohttp.ClientResponseError as e:
+        logging.warning('FAAAIL: ' + str(e))
+
+    return web.json_response({'found log on other node...': 'xD'})
+
+
+async def query(request, log_id, filters=None):
+    filters = filters or []
+
+    if log_id in request.app['local_logs'].logs:
+        logging.info('Query: found local log')
+        return await query_local(request, log_id, filters)
+    else:
+        logging.info('Query: local log not found...')
+        return await query_remote(request.app['config'], request.app['cluster'], log_id, filters)
+
 
 async def dev_cluster_state(request):
     cluster = request.app['cluster']
@@ -133,13 +172,14 @@ def _start(config):
 
     app = connexion.AioHttpApp(__name__, specification_dir='openapi/')
     api = app.add_api('api.yml', pass_context_arg_name='request')
-    logs = Logs(config['data_dir'])
+    local_logs = LocalLogs(config['data_dir'])
     cluster = Cluster(config['network']['bind'], config['network']['peers'])
-    cluster.set_logs(logs)
+    cluster.add_logs(local_logs)
     cluster.sync()
+    api.subapp['config'] = config
     api.subapp['cluster'] = cluster
     api.subapp['data_dir'] = pathlib.Path(config['data_dir'])
-    api.subapp['logs'] = logs 
+    api.subapp['local_logs'] = local_logs
 
     host = config['network']['bind']
     app.run(host=host, port=config['network']['app_port'])
