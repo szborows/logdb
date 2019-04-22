@@ -90,6 +90,10 @@ class Cluster:
             'logs': copy.copy(self._logs.rawData())
         }
 
+    def healthy(self):
+        logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
+        return self._syncObj.getStatus()['leader'] is not None
+
 
 DEFAULT_CONFIG = {
     'network': {
@@ -153,6 +157,10 @@ async def query_remote(config, cluster, log_id, filters):
 
 
 async def create(request, log_id):
+    cluster = request.app['cluster']
+    if not cluster.healthy():
+        raise web.HTTPServiceUnavailable()
+
     if log_id in request.app['local_logs'].logs:
         raise web.HTTPConflict()
     # race condition possible?
