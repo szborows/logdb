@@ -1,3 +1,4 @@
 connexion[aiohttp]==2.2.0
 pyyaml==5.1
 pysyncobj==0.3.4
+aiohttp-autoreload==0.0.1

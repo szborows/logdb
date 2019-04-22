@@ -2,6 +2,7 @@
 
 from aiohttp import web
 import aiohttp
+import aiohttp_autoreload
 import argparse
 import copy
 import json
@@ -175,7 +176,7 @@ def _start(config):
         format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name'])
     )
 
-    logging.info('config:' + json.dumps(config, indent=2))
+    logging.info('config: ' + json.dumps(config, indent=2))
 
     app = connexion.AioHttpApp(__name__, specification_dir='openapi/')
     api = app.add_api('api.yml', pass_context_arg_name='request')
@@ -189,6 +190,7 @@ def _start(config):
     api.subapp['local_logs'] = local_logs
 
     host = config['network']['bind']
+    aiohttp_autoreload.start()
     app.run(host=host, port=config['network']['app_port'])
 
 
