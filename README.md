@@ -27,6 +27,7 @@ cd ../client
 * good distribution
 * high availability
 * failover
+* indices can be immutable up-front: no modification is supported after indexing a log. This can possibly cause problems when one wants to implement streaming logs, but purpose of this research DB is not real-time log indexing, but batch indexing and real-time querying.
 
 
 ## comparison with other databases

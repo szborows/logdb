@@ -2,6 +2,7 @@
 
 from aiohttp import web
 import argparse
+import copy
 import json
 import connexion
 import sqlite3
@@ -24,14 +25,56 @@ class RaftState:
     LEADER = 2
 
 
+class Logs:
+    def __init__(self, data_dir):
+        self.logs = []
+        logging.info('Finding logs on local filesystem')
+        for entry in os.listdir(data_dir):
+            path = os.path.join(data_dir, entry)
+            log_name, ext = os.path.splitext(entry)
+            if ext != '.sqlite':
+                continue
+            self.logs.append(log_name)
+        if self.logs:
+            logging.info('Found following logs on local filesystem: ' + ', '.join(self.logs))
+        else:
+            logging.info('Found no logs on local filesystem')
+
+    def render_state(self, node, cluster_logs):
+        new_state = copy.deepcopy(cluster_logs)
+        for log in self.logs:
+            if log not in new_state:
+                new_state[log] = {'nodes': [node]}
+            else:
+                if node not in new_state[log]['nodes']:
+                    new_state[log]['nodes'].append(node)
+        return new_state
+
+
 class Cluster:
     def __init__(self, addr, peers):
-        self.nodes = [addr] + peers
+        self._addr = addr
+        self._peers = peers
+        self.nodes = [self._addr] + self._peers
         self._state = ReplDict()
-        raft_port = config['network']['raft_port']
-        logging.info('initializing Raft')
-        self._syncObjConf = SyncObjConf(onStateChanged=lambda os, ns: self._stateChanged(os, ns))
-        self._syncObj = SyncObj('{0}:{1}'.format(addr, raft_port), ['{0}:{1}'.format(p, raft_port) for p in peers], consumers=[self._state], conf=self._syncObjConf)
+        self._raft_port = config['network']['raft_port']
+
+    def set_logs(self, logs):
+        self._logs = logs
+
+    def sync(self):
+        logging.info('Syncing cluster state')
+        self._syncObjConf = SyncObjConf(
+            onReady=lambda: self._onReady(),
+            onStateChanged=lambda os, ns: self._stateChanged(os, ns)
+        )
+        self._syncObj = SyncObj(f'{self._addr}:{self._raft_port}', [f'{p}:{self._raft_port}' for p in self._peers], consumers=[self._state], conf=self._syncObjConf)
+
+    def _onReady(self):
+        cluster_logs = self._logs.render_state(self._addr, {} if 'logs' not in self._state else self._state['logs'])
+        logging.warning(f'onReady {cluster_logs}')
+        # this isn't atomic, I bet it's not safe...
+        self._state.set('logs', cluster_logs, sync=True)
 
     def _stateChanged(self, oldState, newState):
         if newState == RaftState.FOLLOWER:
@@ -94,8 +137,13 @@ def _start(config):
 
     app = connexion.AioHttpApp(__name__, specification_dir='openapi/')
     api = app.add_api('api.yml', pass_context_arg_name='request')
-    api.subapp['cluster'] = Cluster(config['network']['bind'], config['network']['peers'])
+    logs = Logs(config['data_dir'])
+    cluster = Cluster(config['network']['bind'], config['network']['peers'])
+    cluster.set_logs(logs)
+    cluster.sync()
+    api.subapp['cluster'] = cluster
     api.subapp['data_dir'] = pathlib.Path(config['data_dir'])
+    api.subapp['logs'] = logs 
 
     host = config['network']['bind']
     app.run(host=host, port=config['network']['app_port'])
