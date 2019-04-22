@@ -57,6 +57,21 @@ paths:
       responses:
         200:
           description: dev
+  /log/{log_id}:
+    post:
+      summary: Create a log.
+      operationId: server.create
+      parameters:
+        - $ref: "#/components/parameters/LogId"
+      responses:
+        409:
+          description: Given log identifier already exists.
+        200:
+          description: Log successfully created.
+          content:
+            application/json:
+              schema:
+                type: object
   /log/{log_id}/query:
     get:
       summary: Query a log.

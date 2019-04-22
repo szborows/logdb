@@ -152,6 +152,16 @@ async def query_remote(config, cluster, log_id, filters):
     return web.json_response({'found log on other node...': 'xD'})
 
 
+async def create(request, log_id):
+    if log_id in request.app['local_logs'].logs:
+        raise web.HTTPConflict()
+    # race condition possible?
+    if log_id in request.app['cluster'].state()['logs']:
+        raise web.HTTPConflict()
+    logging.info('should create new log: ' + log_id)
+    return web.Response()
+
+
 async def query(request, log_id, filters=None):
     filters = filters or []
 
