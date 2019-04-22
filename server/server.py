@@ -69,7 +69,6 @@ class Cluster:
 
     def _onReady(self):
         logging.info(f'Raft ready...')
-        logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
         if self._local_logs.logs:
             logging.info('sending info about local logs')
         # it still doesn't support log replicas...
@@ -166,7 +165,6 @@ async def query(request, log_id, filters=None):
 
 async def dev_cluster_state(request):
     cluster = request.app['cluster']
-    logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
     return web.json_response(cluster.state())
 
 
