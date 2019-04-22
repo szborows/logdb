@@ -1,5 +1,6 @@
 from utils import merge_dicts
 
+
 def compare_dicts(actual, expected, path=None):
     def mkpath(p, *args):
         return '.'.join(p + list(args))
@@ -13,6 +14,7 @@ def compare_dicts(actual, expected, path=None):
                     raise RuntimeError('mismatch at {0}'.format(mkpath(path, key)))
         else:
             raise RuntimeError('missing key ' + mkpath(path, key))
+
 
 def test_merge_dict():
     compare_dicts(merge_dicts({}, {}), {})

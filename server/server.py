@@ -41,6 +41,7 @@ class LocalLogs:
         else:
             logging.info('Found no logs on local filesystem')
 
+
 class Cluster:
     def __init__(self, addr, peers):
         self._addr = addr
@@ -58,11 +59,15 @@ class Cluster:
             onReady=lambda: self._onReady(),
             onStateChanged=lambda os, ns: self._stateChanged(os, ns)
         )
-        self._syncObj = SyncObj(f'{self._addr}:{self._raft_port}', [f'{p}:{self._raft_port}' for p in self._peers], consumers=[self._logs], conf=self._syncObjConf)
+        self._syncObj = SyncObj(
+            f'{self._addr}:{self._raft_port}',
+            [f'{p}:{self._raft_port}' for p in self._peers],
+            consumers=[self._logs],
+            conf=self._syncObjConf
+        )
 
     def _onReady(self):
         logging.info(f'Raft ready...')
-        #import time; time.sleep(5)
         logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
         if self._local_logs.logs:
             logging.info('sending info about local logs')
@@ -165,7 +170,10 @@ async def dev_cluster_state(request):
 
 
 def _start(config):
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name']))
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [{name}] %(message)s'.format(name=config['node']['name'])
+    )
 
     logging.info('config:' + json.dumps(config, indent=2))
 

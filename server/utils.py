@@ -1,5 +1,5 @@
 def merge_dicts(a, b, path=None):
-    if path is None: path = []
+    path = path or []
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
