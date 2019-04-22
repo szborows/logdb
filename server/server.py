@@ -160,8 +160,7 @@ async def query(request, log_id, filters=None):
 
 async def dev_cluster_state(request):
     cluster = request.app['cluster']
-    #logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
-    #cluster.state().set('k', {'nk': 'v'}, sync=True)
+    logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
     return web.json_response(cluster.state())
 
 
