@@ -17,6 +17,7 @@ import random
 import string
 from pysyncobj import SyncObj, SyncObjConf
 from pysyncobj.batteries import ReplCounter, ReplDict
+from functools import wraps
 
 from utils import merge_dicts
 
@@ -156,11 +157,18 @@ async def query_remote(config, cluster, log_id, filters):
     return web.json_response({'found log on other node...': 'xD'})
 
 
-async def create(request, log_id):
-    cluster = request.app['cluster']
-    if not cluster.healthy():
-        raise web.HTTPServiceUnavailable()
+def ensure_cluster_healthy(fn):
+    @wraps(fn)
+    async def wrapper(**kwargs):
+        cluster = kwargs.get('request').app['cluster']
+        if not cluster.healthy():
+            raise web.HTTPServiceUnavailable()
+        return await fn(**kwargs)
+    return wrapper
 
+
+@ensure_cluster_healthy
+async def create(request, log_id):
     if log_id in request.app['local_logs'].logs:
         raise web.HTTPConflict()
     # race condition possible?
