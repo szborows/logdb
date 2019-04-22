@@ -40,27 +40,16 @@ class Logs:
         else:
             logging.info('Found no logs on local filesystem')
 
-    def render_state(self, node, cluster_logs):
-        new_state = copy.deepcopy(cluster_logs)
-        for log in self.logs:
-            if log not in new_state:
-                new_state[log] = {'nodes': [node]}
-            else:
-                if node not in new_state[log]['nodes']:
-                    new_state[log]['nodes'].append(node)
-        return new_state
-
-
 class Cluster:
     def __init__(self, addr, peers):
         self._addr = addr
         self._peers = peers
         self.nodes = [self._addr] + self._peers
-        self._state = ReplDict()
+        self._logs = ReplDict()
         self._raft_port = config['network']['raft_port']
 
     def set_logs(self, logs):
-        self._logs = logs
+        self._local_logs = logs
 
     def sync(self):
         logging.info('Syncing cluster state')
@@ -68,13 +57,18 @@ class Cluster:
             onReady=lambda: self._onReady(),
             onStateChanged=lambda os, ns: self._stateChanged(os, ns)
         )
-        self._syncObj = SyncObj(f'{self._addr}:{self._raft_port}', [f'{p}:{self._raft_port}' for p in self._peers], consumers=[self._state], conf=self._syncObjConf)
+        self._syncObj = SyncObj(f'{self._addr}:{self._raft_port}', [f'{p}:{self._raft_port}' for p in self._peers], consumers=[self._logs], conf=self._syncObjConf)
 
     def _onReady(self):
-        cluster_logs = self._logs.render_state(self._addr, {} if 'logs' not in self._state else self._state['logs'])
-        logging.warning(f'onReady {cluster_logs}')
-        # this isn't atomic, I bet it's not safe...
-        self._state.set('logs', cluster_logs, sync=True)
+        logging.info(f'Raft ready...')
+        #import time; time.sleep(5)
+        logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
+        if self._local_logs.logs:
+            logging.info('sending info about local logs')
+        # it still doesn't support log replicas...
+        for log in self._local_logs.logs:
+            logging.warning(log)
+            self._logs.set(log, self._addr)
 
     def _stateChanged(self, oldState, newState):
         if newState == RaftState.FOLLOWER:
@@ -86,7 +80,9 @@ class Cluster:
         logging.info(f'changed Raft role to: {state}')
 
     def state(self):
-        return self._state
+        return {
+            'logs': copy.copy(self._logs.rawData())
+        }
 
 
 DEFAULT_CONFIG = {
@@ -125,9 +121,9 @@ async def query(request, log_id, filters=None):
 
 async def dev_cluster_state(request):
     cluster = request.app['cluster']
-    logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
+    #logging.info(json.dumps(cluster._syncObj.getStatus(), indent=2))
     #cluster.state().set('k', {'nk': 'v'}, sync=True)
-    return web.json_response(cluster.state().rawData())
+    return web.json_response(cluster.state())
 
 
 def _start(config):
