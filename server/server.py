@@ -6,7 +6,7 @@ import aiohttp_autoreload
 import argparse
 import copy
 import json
-import connexion
+import tempfile
 import sqlite3
 import pathlib
 import base64
@@ -43,6 +43,9 @@ class LocalLogs:
         else:
             logging.info('Found no logs on local filesystem')
 
+    def add(self, name):
+        self.logs.append(name)
+
 
 class Cluster:
     def __init__(self, addr, peers):
@@ -52,10 +55,10 @@ class Cluster:
         self._logs = ReplDict()
         self._raft_port = config['network']['raft_port']
 
-    def add_logs(self, local_logs):
+    def set_local_logs(self, local_logs):
         self._local_logs = local_logs
 
-    def sync(self):
+    def initial_sync(self):
         logging.info('Syncing cluster state')
         self._syncObjConf = SyncObjConf(
             onReady=lambda: self._onReady(),
@@ -70,10 +73,15 @@ class Cluster:
 
     def _onReady(self):
         logging.info(f'Raft ready...')
+        self.sync_logs()
+
+    def sync_logs(self):
         if self._local_logs.logs:
             logging.info('sending info about local logs')
         # it still doesn't support log replicas...
         for log in self._local_logs.logs:
+            if log in self._logs:
+                continue
             logging.warning(log)
             self._logs.set(log, self._addr)
 
@@ -92,7 +100,7 @@ class Cluster:
         }
 
     def healthy(self):
-        logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
+        #logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
         return self._syncObj.getStatus()['leader'] is not None
 
 
@@ -118,7 +126,8 @@ async def query_local(request, log_id, filters):
     conn.load_extension('/usr/lib/sqlite3/pcre.so')
     cursor = conn.cursor()
 
-    filters_str = ' AND '.join(['line REGEXP "' + base64.b64decode(f).decode() + '"' for f in filters])
+    filters = [base64.b64decode(f).decode() for f in filters]
+    filters_str = ' AND '.join(['line REGEXP "' + f + '"' for f in filters])
     size = 5000
     offset = 0
 
@@ -159,28 +168,88 @@ async def query_remote(config, cluster, log_id, filters):
 
 def ensure_cluster_healthy(fn):
     @wraps(fn)
-    async def wrapper(**kwargs):
-        cluster = kwargs.get('request').app['cluster']
+    async def wrapper(request, **kwargs):
+        cluster = request.app['cluster']
         if not cluster.healthy():
             raise web.HTTPServiceUnavailable()
-        return await fn(**kwargs)
+        return await fn(request, **kwargs)
     return wrapper
 
 
+async def create_log(log_id, read_chunk_fn, output_path):
+    size = 0
+    with tempfile.NamedTemporaryFile() as tf:
+        while True:
+            chunk = await read_chunk_fn()
+            if not chunk:
+                break
+            tf.write(chunk)
+        tf.flush()
+
+        if output_path.exists():
+            raise RuntimeError(f'file {output_path} already exists!')
+
+        conn = sqlite3.connect(str(output_path))
+        cur = conn.cursor()
+
+        CREATE_TABLE = '''
+            CREATE TABLE logs (
+                tags varchar(255),
+                labels varchar(512),
+                timestamp int,
+                line text NOT NULL
+            );
+        '''
+        cur.execute(CREATE_TABLE)
+
+        with open(tf.name) as f:
+            for line in f:
+                j = json.loads(line)
+                tags, labels, timestamp, line = ','.join(j['tags']), ','.join(j['labels']), j['timestamp'], j['line']
+                cur.execute(
+                    f'INSERT INTO logs (tags, labels, timestamp, line) VALUES '
+                    f'("{tags}", "{labels}", "{timestamp}", "{line}")'
+                )
+            conn.commit()
+        conn.close()
+
 @ensure_cluster_healthy
-async def create(request, log_id):
+async def create(request):
+    log_id = request.match_info['log_id']
     if log_id in request.app['local_logs'].logs:
         raise web.HTTPConflict()
     # race condition possible?
     if log_id in request.app['cluster'].state()['logs']:
         raise web.HTTPConflict()
     logging.info('should create new log: ' + log_id)
+
+    # lot of stuff is not handled in this endpoint:
+    # - file should not be created on disk
+    # - backpressure is not handled
+    # - retry is AFAIK not possible
+
+    reader = await request.multipart()
+    field = await reader.next()
+
+    if field.name != 'file':
+        raise web.HTTPBadRequest(body=b'request should contain a file named "file"')
+
+    output_path = pathlib.Path(request.app['config']['data_dir']) / f'{log_id}.sqlite'
+    await create_log(log_id, field.read_chunk, output_path) 
+    request.app['local_logs'].add(log_id)
+    request.app['cluster'].sync_logs()
+    # read_chunk uses 8192 bytes by default...
+
     return web.Response()
 
+@ensure_cluster_healthy
+async def list_logs(request):
+    return web.json_response(list(request.app['cluster'].state()['logs'].keys()))
 
 @ensure_cluster_healthy
-async def query(request, log_id, filters=None):
-    filters = filters or []
+async def query(request):
+    log_id = request.match_info['log_id']
+    filters = request.query.get('filters', '').split(',')
 
     if log_id in request.app['local_logs'].logs:
         logging.info('Query: found local log')
@@ -203,20 +272,28 @@ def _start(config):
 
     logging.info('config: ' + json.dumps(config, indent=2))
 
-    app = connexion.AioHttpApp(__name__, specification_dir='openapi/')
-    api = app.add_api('api.yml', pass_context_arg_name='request')
+    app = web.Application()
+    app.add_routes([
+        web.get('/api/v1/dev/cs', dev_cluster_state),
+        web.get('/api/v1/logs', list_logs),
+        web.post('/api/v1/log/{log_id}', create),
+        web.get('/api/v1/log/{log_id}/query', query)
+    ])
+
     local_logs = LocalLogs(config['data_dir'])
     cluster = Cluster(config['network']['bind'], config['network']['peers'])
-    cluster.add_logs(local_logs)
-    cluster.sync()
-    api.subapp['config'] = config
-    api.subapp['cluster'] = cluster
-    api.subapp['data_dir'] = pathlib.Path(config['data_dir'])
-    api.subapp['local_logs'] = local_logs
+    cluster.set_local_logs(local_logs)
+    cluster.initial_sync()
+    app['config'] = config
+    app['cluster'] = cluster
+    app['data_dir'] = pathlib.Path(config['data_dir'])
+    app['local_logs'] = local_logs
+
+    #api.subapp.router.add_post("/qrwa", create)
 
     host = config['network']['bind']
     aiohttp_autoreload.start()
-    app.run(host=host, port=config['network']['app_port'])
+    web.run_app(app, host=host, port=config['network']['app_port'])
 
 
 if __name__ == '__main__':
