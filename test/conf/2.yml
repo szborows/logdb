@@ -1,0 +1,8 @@
+node:
+  name: 'Server2'
+network:
+  bind: 'server2'
+  peers:
+    - 'server1'
+    - 'server3'
+data_dir: /data

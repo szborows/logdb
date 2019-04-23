@@ -1,0 +1,37 @@
+version: '3.5'
+services:
+  server1:
+    build:
+      context: ../server
+    image: "logdb/logdb"
+    volumes:
+      - "../server:/app:ro"
+      - "./conf:/conf:ro"
+      - "/data"
+    entrypoint: ./app/server.py -c /conf/1.yml
+  server2:
+    build:
+      context: ../server
+    image: "logdb/logdb"
+    volumes:
+      - "../server:/app:ro"
+      - "./conf:/conf:ro"
+      - "/data"
+    entrypoint: ./app/server.py -c /conf/2.yml
+  server3:
+    build:
+      context: ../server
+    image: "logdb/logdb"
+    volumes:
+      - "../server:/app:ro"
+      - "./conf:/conf:ro"
+      - "/data"
+    entrypoint: ./app/server.py -c /conf/3.yml
+  test_executor:
+    build:
+      context: ./executor
+    volumes:
+      - "../logdb:/usr/local/bin/logdb"
+      - "./utils:/utils:ro"
+      - "./example-logs:/logs:ro"
+    entrypoint: sleep 365d

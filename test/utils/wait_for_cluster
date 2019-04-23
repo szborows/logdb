@@ -1,0 +1,21 @@
+#!/bin/bash
+set -euo pipefail
+
+DELAY=1
+RETRIES_MAX=120
+
+healthy=0
+attempt=0
+
+while [[ "$healthy" -ne 1 && "$((attempt++))" -lt "$RETRIES_MAX" ]]; do
+    echo "waiting for all nodes to report cluster as healthy (attempt $attempt)"
+    r1=`logdb --logdb-url=http://server1:8080 -o json status | jq .healthy || true`
+    r2=`logdb --logdb-url=http://server2:8080 -o json status | jq .healthy || true`
+    r3=`logdb --logdb-url=http://server3:8080 -o json status | jq .healthy || true`
+    if [ "$r1" = "true" ] && [ "$r2" = "true" ] && [ "$r3" = "true" ]; then
+        exit 0
+    fi
+    sleep $DELAY
+done
+
+exit 1
