@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import base64
+import json
 import requests
 
 
@@ -13,12 +14,30 @@ class LogDB:
     def _api_url(self, path):
         return f'{self.url}/api/v1{path}'
 
+    def status(self):
+        try:
+            r = self.session.get(self._api_url('/status'))
+            r.raise_for_status()
+            rj = r.json()
+            if self.json:
+                print(json.dumps(rj))
+            else:
+                if rj['healthy']:
+                    print('Cluster is healthy')
+                else:
+                    print('Cluster is NOT healthy!!')
+        except requests.exceptions.ConnectionError:
+            if self.json:
+                print(json.dumps({'error': 'connection error'}))
+            else:
+                print('ERROR: connection error')
+
     def list_logs(self):
         r = self.session.get(self._api_url('/logs'))
         r.raise_for_status()
         rj = r.json()
         if self.json:
-            print(rj)
+            print(json.dumps(rj))
         else:
             for log in rj:
                 print(log)
@@ -36,14 +55,16 @@ class LogDB:
         r.raise_for_status()
         rj = r.json()
         if self.json:
-            print(rj)
+            print(json.dumps(rj))
         else:
             print(rj['log_lines'])
 
 
 def start(args):
     logdb = LogDB(args.logdb_url, args.output == 'json')
-    if args.task == 'logs':
+    if args.task == 'status':
+        logdb.status()
+    elif args.task == 'logs':
         logdb.list_logs()
     elif args.task == 'upload':
         logdb.upload(args.file, args.log_id)
@@ -59,6 +80,7 @@ if __name__ == '__main__':
     ap.add_argument('-o', '--output', choices=('text', 'json'), default='text')
     subparsers = ap.add_subparsers(dest='task')
     subparsers.required = True
+    status_parser = subparsers.add_parser('status')
     logs_parser = subparsers.add_parser('logs')
     upload_parser = subparsers.add_parser('upload')
     upload_parser.add_argument('file', type=argparse.FileType('r'), help='File to upload')

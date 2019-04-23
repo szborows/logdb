@@ -117,6 +117,13 @@ DEFAULT_CONFIG = {
 }
 
 
+async def cluster_status(request):
+    cluster = request.app['cluster']
+    return web.json_response({
+        'healthy': cluster.healthy()
+    })
+
+
 async def query_local(request, log_id, filters):
     path = request.app['data_dir'] / f'{log_id}.sqlite'
     if not path.exists():
@@ -274,6 +281,7 @@ def _start(config):
 
     app = web.Application()
     app.add_routes([
+        web.get('/api/v1/status', cluster_status),
         web.get('/api/v1/dev/cs', dev_cluster_state),
         web.get('/api/v1/logs', list_logs),
         web.post('/api/v1/log/{log_id}', create),
