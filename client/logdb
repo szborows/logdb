@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import base64
 import requests
 
 
@@ -23,9 +24,21 @@ class LogDB:
                 print(log)
 
     def upload(self, file, log_id):
-        print(f'gonna upload {file.name} as {log_id}')
         r = self.session.post(self._api_url(f'/log/{log_id}'), files={'file': file})
         r.raise_for_status()
+        print('ok')
+
+    def query(self, log_id, filters):
+        filters_str = ''
+        if filters:
+            filters_str = '?filters=' + b','.join(base64.b64encode(f.encode()) for f in filters).decode()
+        r = self.session.get(self._api_url(f'/log/{log_id}/query{filters_str}'))
+        r.raise_for_status()
+        rj = r.json()
+        if self.json:
+            print(rj)
+        else:
+            print(rj['log_lines'])
 
 
 def start(args):
@@ -34,6 +47,8 @@ def start(args):
         logdb.list_logs()
     elif args.task == 'upload':
         logdb.upload(args.file, args.log_id)
+    elif args.task == 'query':
+        logdb.query(args.log_id, args.filter or [])
     else:
         raise NotImplementedError()
 
@@ -48,5 +63,8 @@ if __name__ == '__main__':
     upload_parser = subparsers.add_parser('upload')
     upload_parser.add_argument('file', type=argparse.FileType('r'), help='File to upload')
     upload_parser.add_argument('log_id', help='Log identifier')
+    query_parser = subparsers.add_parser('query')
+    query_parser.add_argument('-f', '--filter', action='append')
+    query_parser.add_argument('log_id', help='Log identifier')
     args = ap.parse_args()
     start(args)
