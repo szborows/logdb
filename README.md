@@ -4,7 +4,7 @@ Log Research Database
 [![Build Status](https://travis-ci.com/szborows/logdb.svg?branch=master)](https://travis-ci.com/szborows/logdb)
 
 
-This is both research project and a hobby project. It's not mature, it doesn't have appropriate quality and it's not production-grade!
+This is both research project and a hobby project. It's not mature, it doesn't have appropriate quality and it's not production-grade! The code may be crappy in some places and perhaps there are code smells around. However I decided to start with something crappy that works and then improve quality. I'm adopting philosophy from c2: make it work, make it work properly and then make it fast.
 
 Performance and security is not of a concern too. Ofc currently. The plan is to implement proper distribution and then optimize code working on a slave node.
 
