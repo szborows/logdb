@@ -100,7 +100,6 @@ class Cluster:
         }
 
     def healthy(self):
-        #logging.info(json.dumps(self._syncObj.getStatus(), indent=2))
         return self._syncObj.getStatus()['leader'] is not None
 
 
@@ -220,6 +219,7 @@ async def create_log(log_id, read_chunk_fn, output_path):
             conn.commit()
         conn.close()
 
+
 @ensure_cluster_healthy
 async def create(request):
     log_id = request.match_info['log_id']
@@ -242,16 +242,18 @@ async def create(request):
         raise web.HTTPBadRequest(body=b'request should contain a file named "file"')
 
     output_path = pathlib.Path(request.app['config']['data_dir']) / f'{log_id}.sqlite'
-    await create_log(log_id, field.read_chunk, output_path) 
+    await create_log(log_id, field.read_chunk, output_path)
     request.app['local_logs'].add(log_id)
     request.app['cluster'].sync_logs()
     # read_chunk uses 8192 bytes by default...
 
     return web.Response()
 
+
 @ensure_cluster_healthy
 async def list_logs(request):
     return web.json_response(list(request.app['cluster'].state()['logs'].keys()))
+
 
 @ensure_cluster_healthy
 async def query(request):
@@ -264,6 +266,14 @@ async def query(request):
     else:
         logging.info('Query: local log not found...')
         return await query_remote(request.app['config'], request.app['cluster'], log_id, filters)
+
+
+@ensure_cluster_healthy
+async def log_status(request):
+    log_id = request.match_info['log_id']
+    # TODO: implementation goes here
+    #        - ad-hoc query SQLite local/remote?
+    #        - store value in Raft?
 
 
 async def dev_cluster_state(request):
@@ -285,6 +295,7 @@ def _start(config):
         web.get('/api/v1/dev/cs', dev_cluster_state),
         web.get('/api/v1/logs', list_logs),
         web.post('/api/v1/log/{log_id}', create),
+        web.get('/api/v1/log/{log_id}/status', log_status),
         web.get('/api/v1/log/{log_id}/query', query)
     ])
 
@@ -296,8 +307,6 @@ def _start(config):
     app['cluster'] = cluster
     app['data_dir'] = pathlib.Path(config['data_dir'])
     app['local_logs'] = local_logs
-
-    #api.subapp.router.add_post("/qrwa", create)
 
     host = config['network']['bind']
     aiohttp_autoreload.start()
