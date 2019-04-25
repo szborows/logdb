@@ -1,0 +1,31 @@
+version: 2.1
+jobs:
+  pycodestyle:
+    docker:
+      - image: python:3.7.1-alpine3.8
+    steps:
+      - checkout
+      - run: pip3 install tox
+      - run: tox -e pycodestyle
+#  pylint-errors:
+#    docker:
+#      - image: python:3.7.1-alpine3.8
+#    steps:
+#      - checkout
+#      - run: apk --no-cache update && apk --no-cache add build-base
+#      - run: pip3 install tox
+#      - run: tox -e pylint-errors
+  ut:
+    docker:
+      - image: python:3.7.1-alpine3.8
+    steps:
+      - checkout
+      - run: pip3 install tox
+      - run: tox -e ut
+workflows:
+  version: 2
+  test:
+    jobs:
+      - pycodestyle
+#      - pylint-errors
+      - ut
