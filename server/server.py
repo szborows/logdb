@@ -84,10 +84,11 @@ async def query_local(request, log_id, filters):
 
 
 async def query_remote(config, cluster, log_id, filters):
-    node = cluster.state()['logs'].get(log_id)
-    if node is None:
+    log_info = cluster.logs.get_log(log_id)
+    if log_info is None:
         return web.json_response({'error': 'log not found in cluster'}, status=404)
-    logging.info('Found node which holds requested log: ' + node)
+    log_replica_node = log_info['replicas'][0]
+    logging.info('Found node which holds requested log: ' + log_replica_node)
     # streaming HTTP could possibly be used too, but with current assumptions 1 line is up to
     # 513 bytes, and 15k is expected number of lines fetched. that gives 7.5MB. Not too bad.
 
@@ -99,7 +100,7 @@ async def query_remote(config, cluster, log_id, filters):
     try:
         async with aiohttp.ClientSession(raise_for_status=True) as client:
             port = config['network']['app_port']
-            url = f'http://{node}:{port}/api/v1/log/{log_id}/query{filters_str}'
+            url = f'http://{log_replica_node}:{port}/api/v1/log/{log_id}/query{filters_str}'
             response = await client.get(url)
             return web.json_response(await response.json())
     except aiohttp.ClientResponseError as e:
@@ -162,7 +163,7 @@ async def create(request):
     if log_id in request.app['local_logs'].logs:
         raise web.HTTPConflict()
     # race condition possible?
-    if log_id in request.app['cluster'].state()['logs']:
+    if log_id in request.app['cluster'].logs.get_logs():
         raise web.HTTPConflict()
     logging.info('should create new log: ' + log_id)
 
@@ -188,7 +189,7 @@ async def create(request):
 
 @ensure_cluster_healthy
 async def list_logs(request):
-    return web.json_response(list(request.app['cluster'].state()['logs'].keys()))
+    return web.json_response(list(request.app['cluster'].logs.get_logs().keys()))
 
 
 @ensure_cluster_healthy

@@ -6,6 +6,7 @@ import logging
 import copy
 
 from nodes import Nodes
+from logs import Logs
 from node_worker import node_worker
 from utils import RaftState
 
@@ -14,8 +15,7 @@ class Cluster:
     def __init__(self, config, addr, peers):
         self._addr = addr
         self._peers = peers
-        self.nodes = [self._addr] + self._peers
-        self._logs = ReplDict()
+        self.logs = Logs()
         self._raft_port = config['network']['raft_port']
 
     def set_local_logs(self, local_logs):
@@ -36,7 +36,7 @@ class Cluster:
         self._syncObj = SyncObj(
             f'{self._addr}:{self._raft_port}',
             [f'{p}:{self._raft_port}' for p in self._peers],
-            consumers=[self._logs, self.nodes],
+            consumers=[self.logs, self.nodes],
             conf=self._syncObjConf
         )
 
@@ -50,10 +50,10 @@ class Cluster:
             logging.info('sending info about local logs')
         # it still doesn't support log replicas...
         for log in self._local_logs.logs:
-            if log in self._logs:
+            if log in self.logs.get_logs():
                 continue
             logging.warning(log)
-            self._logs.set(log, self._addr)
+            self.logs.add_log(log, {'replicas': [self._addr]})
 
     def _stateChanged(self, oldState, newState):
         if newState == RaftState.LEADER:
@@ -69,7 +69,7 @@ class Cluster:
 
     def state(self):
         return {
-            'logs': copy.copy(self._logs.rawData()),
+            'logs': copy.copy(self.logs.get_logs()),
             'nodes': copy.copy(self.nodes.get_nodes())
         }
 
