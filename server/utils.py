@@ -9,3 +9,9 @@ def merge_dicts(a, b, path=None):
         else:
             a[key] = b[key]
     return a
+
+class RaftState:
+    FOLLOWER = 0
+    CANDIDATE = 1
+    LEADER = 2
+
