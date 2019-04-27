@@ -14,6 +14,21 @@ class LogDB:
     def _api_url(self, path):
         return f'{self.url}/api/v1{path}'
 
+    def log_status(self, log_id):
+        try:
+            r = self.session.get(self._api_url(f'/log/{log_id}/status'))
+            r.raise_for_status()
+            rj = r.json()
+            if self.json:
+                print(json.dumps(rj))
+            else:
+                print(json.dumps(rj))
+        except requests.exceptions.ConnectionError:
+            if self.json:
+                print(json.dumps({'error': 'connection error'}))
+            else:
+                print('ERROR: connection error')
+
     def status(self):
         try:
             r = self.session.get(self._api_url('/status'))
@@ -64,6 +79,8 @@ def start(args):
     logdb = LogDB(args.logdb_url, args.output == 'json')
     if args.task == 'status':
         logdb.status()
+    elif args.task == 'log-status':
+        logdb.log_status(args.log_id)
     elif args.task == 'logs':
         logdb.list_logs()
     elif args.task == 'upload':
@@ -81,6 +98,8 @@ if __name__ == '__main__':
     subparsers = ap.add_subparsers(dest='task')
     subparsers.required = True
     status_parser = subparsers.add_parser('status')
+    log_status_parser = subparsers.add_parser('log-status')
+    log_status_parser.add_argument('log_id')
     logs_parser = subparsers.add_parser('logs')
     upload_parser = subparsers.add_parser('upload')
     upload_parser.add_argument('file', type=argparse.FileType('r'), help='File to upload')

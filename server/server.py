@@ -208,6 +208,7 @@ async def query(request):
 @ensure_cluster_healthy
 async def log_status(request):
     log_id = request.match_info['log_id']
+    return web.json_response(request.app['cluster'].logs.get_log(log_id))
     # TODO: implementation goes here
     #        - ad-hoc query SQLite local/remote?
     #        - store value in Raft?

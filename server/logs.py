@@ -16,3 +16,9 @@ class Logs(SyncObjConsumer):
 
     def get_log(self, log_id):
         return self._logs.get(log_id)
+
+
+class LogState:
+    SHOULD_REPLICATE = 0
+    REPLICATING = 1
+    REPLICATED = 2

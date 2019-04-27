@@ -15,6 +15,8 @@ def node_worker(cluster, self_addr, initial_role, q):
         logs = cluster.logs.get_logs()
         for log_id in logs:
             log_info = logs[log_id]
+            # maybe pysyncobj queue could be used to cluster-level agree on
+            # replication orders?
             if len(log_info['replicas']) < 2:
                 logging.info(f'log {log_id} should be replicated. {log_info}')
         # iterate through logs. find logs which aren't replicated and order replication

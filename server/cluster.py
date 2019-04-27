@@ -6,7 +6,7 @@ import logging
 import copy
 
 from nodes import Nodes
-from logs import Logs
+from logs import Logs, LogState
 from node_worker import node_worker
 from utils import RaftState
 
@@ -53,7 +53,7 @@ class Cluster:
             if log in self.logs.get_logs():
                 continue
             logging.warning(log)
-            self.logs.add_log(log, {'replicas': [self._addr]})
+            self.logs.add_log(log, {'replicas': [self._addr], 'state': LogState.SHOULD_REPLICATE})
 
     def _stateChanged(self, oldState, newState):
         if newState == RaftState.LEADER:
