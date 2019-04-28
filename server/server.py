@@ -87,6 +87,7 @@ async def query_remote(config, cluster, log_id, filters):
     log_info = cluster.logs.get_log(log_id)
     if log_info is None:
         return web.json_response({'error': 'log not found in cluster'}, status=404)
+    # TODO: should not pick first one!
     log_replica_node = log_info['replicas'][0]
     logging.info('Found node which holds requested log: ' + log_replica_node)
     # streaming HTTP could possibly be used too, but with current assumptions 1 line is up to
@@ -188,6 +189,13 @@ async def create(request):
 
 
 @ensure_cluster_healthy
+async def replicate_log(request):
+    log_id = request.match_info['log_id']
+    logging.info(f'received request to replicate log {log_id}')
+    return web.json_response({'acknowledged': True})
+
+
+@ensure_cluster_healthy
 async def list_logs(request):
     return web.json_response(request.app['cluster'].logs.get_logs())
 
@@ -225,7 +233,7 @@ async def dev_readonly(request):
     if 'readonly' not in pd or pd['readonly'] not in ('true', 'false'):
         raise web.HTTPBadRequest()
     request.app['cluster'].local_msg(['set-readwrite', 'set-readonly'][pd['readonly'] == 'true'])
-    return web.json_response({"acknowledged": True})
+    return web.json_response({'acknowledged': True})
 
 
 async def dev_cluster_state(request):
@@ -249,6 +257,7 @@ def _start(config):
         web.get('/api/v1/logs', list_logs),
         web.get('/api/v1/nodes', list_nodes),
         web.post('/api/v1/log/{log_id}', create),
+        web.post('/api/v1/log/{log_id}/replicate', replicate_log),
         web.get('/api/v1/log/{log_id}/status', log_status),
         web.get('/api/v1/log/{log_id}/query', query)
     ])

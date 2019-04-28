@@ -30,7 +30,11 @@ class LogDB:
             if self.json:
                 print(json.dumps(rj))
             else:
-                print(json.dumps(rj))
+                print('log id:\t\t\t' + log_id)
+                print('replica nodes:\t' + ', '.join(rj['replicas']))
+                if 'replicating' in rj:
+                    print('details:')
+                    print('  * log undergoes replication started at ' + rj['replication_started_at'] + ' from ' + rj['replication_origin'] + ' to ' + rj['replication_target'])
         except requests.exceptions.ConnectionError:
             if self.json:
                 print(json.dumps({'error': 'connection error'}))

@@ -11,6 +11,12 @@ class Logs(SyncObjConsumer):
             raise RuntimeError(f'{log_id} already exists!')
         self._logs[log_id] = log_info
 
+    @replicated
+    def update_log(self, log_id, log_info):
+        if log_id not in self._logs:
+            raise RuntimeError(f'unknown log {log_id}')
+        self._logs[log_id].update(log_info)
+
     def get_logs(self):
         return self._logs
 
