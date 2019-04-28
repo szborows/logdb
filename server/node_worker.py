@@ -1,5 +1,7 @@
 import logging
 import queue
+import datetime
+import random
 
 
 def node_worker(cluster, self_addr, initial_role, q):
@@ -19,6 +21,18 @@ def node_worker(cluster, self_addr, initial_role, q):
             # replication orders?
             if len(log_info['replicas']) < 2:
                 logging.info(f'log {log_id} should be replicated. {log_info}')
+                possible_replica_nodes = list(cluster.nodes.get_nodes().keys())
+                if not possible_replica_nodes:
+                    # perhaps Raft sync is still in progress?
+                    # if so, we should never fire {leader,follower}_work() function...
+                    continue
+                try:
+                    possible_replica_nodes.remove(log_info['replicas'][0])
+                except ValueError:
+                    logging.warning('weird.. node that holds original log is not listed in cluster nodes')
+                logging.info(f'possible nodes for replication: {possible_replica_nodes}')
+                replica_node = random.choice(possible_replica_nodes)
+                logging.info(f'picked {replica_node} replication node')
         # iterate through logs. find logs which aren't replicated and order replication
 
     def follower_work():
