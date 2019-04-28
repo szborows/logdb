@@ -62,8 +62,10 @@ class LogDB:
         if self.json:
             print(json.dumps(rj))
         else:
+            print('log_name\treplicas')
             for log in rj:
-                print(log)
+                replicas = str(len(rj[log]['replicas'])) + '/2'
+                print(f'{log}\t\t{replicas}')
 
     def list_nodes(self):
         r = self.session.get(self._api_url('/nodes'))

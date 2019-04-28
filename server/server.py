@@ -189,7 +189,7 @@ async def create(request):
 
 @ensure_cluster_healthy
 async def list_logs(request):
-    return web.json_response(list(request.app['cluster'].logs.get_logs().keys()))
+    return web.json_response(request.app['cluster'].logs.get_logs())
 
 
 @ensure_cluster_healthy
