@@ -17,6 +17,7 @@ class Cluster:
         self._peers = peers
         self.logs = Logs()
         self._raft_port = config['network']['raft_port']
+        self.config = config
 
     def set_local_logs(self, local_logs):
         self._local_logs = local_logs

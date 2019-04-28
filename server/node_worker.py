@@ -2,6 +2,12 @@ import logging
 import queue
 import datetime
 import random
+import os
+
+
+def _free_disk_space(cluster):
+    stat = os.statvfs(cluster.config['data_dir'])
+    return stat.f_bfree * stat.f_bsize
 
 
 def node_worker(cluster, self_addr, initial_role, q):
@@ -9,12 +15,10 @@ def node_worker(cluster, self_addr, initial_role, q):
     readonly = False
 
     def common_work():
-        cluster.nodes.update_node(self_addr, {'readonly': readonly, 'disk_space': 0})
-        # report disk usage
-        pass
+        cluster.nodes.update_node(self_addr, {'readonly': readonly, 'disk_space': _free_disk_space(cluster)})
 
     def leader_work():
-        logging.info('doing leader work')
+        logging.info('leader active')
         logs = cluster.logs.get_logs()
         for log_id in logs:
             log_info = logs[log_id]
