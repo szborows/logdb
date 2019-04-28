@@ -40,6 +40,9 @@ class Cluster:
             conf=self._syncObjConf
         )
 
+    def local_msg(self, msg):
+        self.worker_q.put(msg)
+
     def _onReady(self):
         logging.info(f'Raft ready...')
         self.worker.start()

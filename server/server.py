@@ -214,6 +214,15 @@ async def log_status(request):
     #        - store value in Raft?
 
 
+@ensure_cluster_healthy
+async def dev_readonly(request):
+    pd = await request.post()
+    if 'readonly' not in pd or pd['readonly'] not in ('true', 'false'):
+        raise web.HTTPBadRequest()
+    request.app['cluster'].local_msg(['set-readwrite', 'set-readonly'][pd['readonly'] == 'true'])
+    return web.json_response({"acknowledged": True})
+
+
 async def dev_cluster_state(request):
     cluster = request.app['cluster']
     return web.json_response(cluster.state())
@@ -231,6 +240,7 @@ def _start(config):
     app.add_routes([
         web.get('/api/v1/status', cluster_status),
         web.get('/api/v1/dev/cs', dev_cluster_state),
+        web.post('/api/v1/dev/readonly', dev_readonly),
         web.get('/api/v1/logs', list_logs),
         web.post('/api/v1/log/{log_id}', create),
         web.get('/api/v1/log/{log_id}/status', log_status),
@@ -247,6 +257,8 @@ def _start(config):
     app['local_logs'] = local_logs
 
     host = config['network']['bind']
+    app['self_addr'] = host
+
     aiohttp_autoreload.start()
     web.run_app(app, host=host, port=config['network']['app_port'])
 
