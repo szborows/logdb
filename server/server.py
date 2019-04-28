@@ -193,6 +193,11 @@ async def list_logs(request):
 
 
 @ensure_cluster_healthy
+async def list_nodes(request):
+    return web.json_response(request.app['cluster'].nodes.get_nodes())
+
+
+@ensure_cluster_healthy
 async def query(request):
     log_id = request.match_info['log_id']
     filters = request.query.get('filters', '').split(',')
@@ -242,6 +247,7 @@ def _start(config):
         web.get('/api/v1/dev/cs', dev_cluster_state),
         web.post('/api/v1/dev/readonly', dev_readonly),
         web.get('/api/v1/logs', list_logs),
+        web.get('/api/v1/nodes', list_nodes),
         web.post('/api/v1/log/{log_id}', create),
         web.get('/api/v1/log/{log_id}/status', log_status),
         web.get('/api/v1/log/{log_id}/query', query)

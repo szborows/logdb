@@ -31,7 +31,7 @@ services:
     build:
       context: ./executor
     volumes:
-      - "../logdb:/usr/local/bin/logdb"
+      - "../logdb:/usr/local/bin/logdb:ro"
       - "./utils:/utils:ro"
       - "./example-logs:/logs:ro"
     entrypoint: sleep 365d

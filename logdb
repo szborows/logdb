@@ -5,6 +5,14 @@ import json
 import requests
 
 
+def _sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
 class LogDB:
     def __init__(self, logdb_url, output_json=False):
         self.url = logdb_url
@@ -57,6 +65,19 @@ class LogDB:
             for log in rj:
                 print(log)
 
+    def list_nodes(self):
+        r = self.session.get(self._api_url('/nodes'))
+        r.raise_for_status()
+        rj = r.json()
+        if self.json:
+            print(json.dumps(rj))
+        else:
+            print('node\t\tdisk space\treadonly')
+            for node in rj:
+                disk_space = _sizeof_fmt(rj[node]['disk_space'])
+                readonly = rj[node]['readonly']
+                print(f'{node}\t\t{disk_space}\t\t{readonly}')
+
     def upload(self, file, log_id):
         r = self.session.post(self._api_url(f'/log/{log_id}'), files={'file': file})
         r.raise_for_status()
@@ -79,10 +100,12 @@ def start(args):
     logdb = LogDB(args.logdb_url, args.output == 'json')
     if args.task == 'status':
         logdb.status()
-    elif args.task == 'log-status':
+    elif args.task == 'log':
         logdb.log_status(args.log_id)
     elif args.task == 'logs':
         logdb.list_logs()
+    elif args.task == 'nodes':
+        logdb.list_nodes()
     elif args.task == 'upload':
         logdb.upload(args.file, args.log_id)
     elif args.task == 'query':
@@ -98,9 +121,10 @@ if __name__ == '__main__':
     subparsers = ap.add_subparsers(dest='task')
     subparsers.required = True
     status_parser = subparsers.add_parser('status')
-    log_status_parser = subparsers.add_parser('log-status')
+    log_status_parser = subparsers.add_parser('log')
     log_status_parser.add_argument('log_id')
     logs_parser = subparsers.add_parser('logs')
+    nodes_parser = subparsers.add_parser('nodes')
     upload_parser = subparsers.add_parser('upload')
     upload_parser.add_argument('file', type=argparse.FileType('r'), help='File to upload')
     upload_parser.add_argument('log_id', help='Log identifier')
