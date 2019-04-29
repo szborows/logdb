@@ -4,11 +4,19 @@ import datetime
 import random
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+_DATE_FMT = '%Y-%m-%d %H:%M:%S.%f'
+_MAX_REPLICATION_TIME = 30
 
 
 def _now():
-    return datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+    return datetime.now().strftime(_DATE_FMT)
+
+
+def _dtp(dt):
+    return datetime.strptime(dt, _DATE_FMT)
 
 
 def _free_disk_space(cluster):
@@ -28,8 +36,11 @@ def node_worker(cluster, self_addr, initial_role, q):
         def should_replicate_log(log_info):
             if len(log_info['replicas']) == 2:
                 return False
-            # TODO: replicating can take forever! should check some dates too..
-            if 'replicating' in log_info and  log_info['replicating']:
+            if 'replication_started_at' not in log_info:
+                return True
+            if (datetime.now() - _dtp(log_info['replication_started_at'])).total_seconds() > _MAX_REPLICATION_TIME:
+                return True
+            if 'replicating' in log_info and log_info['replicating']:
                 return False
             return True
 
