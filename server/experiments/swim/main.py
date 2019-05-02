@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 
-from twisted.internet.protocol import DatagramProtocol
-from twisted.internet import reactor
+import asyncio
 
 
-class Echo(DatagramProtocol):
+class MyProtocol(asyncio.DatagramProtocol):
+    def __init__(self):
+        super().__init__()
 
-    def datagramReceived(self, data, addr):
-        print("received %r from %s" % (data, addr))
-        self.transport.write(data, addr)
+    def connection_made(self, transport):
+        self.transport = transport
 
-reactor.listenUDP(9999, Echo())
-reactor.run()
+    def datagram_received(self, data, addr):
+        print(data)
 
+async def _init():
+    await loop.create_datagram_endpoint(MyProtocol,local_addr=('127.0.0.1', 9999))
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_init())
+    loop.run_forever()
