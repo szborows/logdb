@@ -2,9 +2,10 @@
 
 import asyncio
 import json
+import logging
 
 
-class MyProtocol(asyncio.DatagramProtocol):
+class LocalProtocol(asyncio.DatagramProtocol):
     def __init__(self):
         super().__init__()
 
@@ -12,7 +13,16 @@ class MyProtocol(asyncio.DatagramProtocol):
         self.transport = transport
 
     def datagram_received(self, data, addr):
-        print(json.loads(data))
+        request = json.loads(data)
+        if request['type'] == 'ping':
+            self.transport.sendto(json.dumps({'type': 'ack'}).encode(), addr)
+        elif request['type'] == 'ping-req':
+            print('ping req received')
+        elif request['type'] == 'ack':
+            print('ack received')
+        else:
+            logging.error('Received unknown request type: ' + str(request['type']))
+
 
 # TODO: should support iteration, dict-like interface or equivalent
 class Membership:
@@ -32,7 +42,7 @@ async def _run_failure_detector(net, membership):
         await asyncio.sleep(1)
 
 async def _init(loop):
-    net = await loop.create_datagram_endpoint(MyProtocol, local_addr=('127.0.0.1', 9999))
+    net = await loop.create_datagram_endpoint(LocalProtocol, local_addr=('127.0.0.1', 9999))
     membership = Membership()
     asyncio.ensure_future(_run_disseminator(net, membership))
     asyncio.ensure_future(_run_failure_detector(net, membership))
