@@ -16,14 +16,11 @@ class LocalProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         request = json.loads(data)
         if request['type'] == 'ping':
-            self.on_ping(self, addr)
+            self.on_ping(self, addr, request)
         elif request['type'] == 'ping-req':
-            self.transport.sendto(json.dumps({'type': 'ping'}).encode(), addr)
-            request['target']
-            print('ping req received')
+            self.on_ping_req(self, addr, request['target'], request)
         elif request['type'] == 'ack':
-            # must decide if this is ack from ping or ping-req
-            print('ack received')
+            self.on_ack(self, addr, request)
         else:
             logging.error('Received unknown request type: ' + str(request['type']))
 
@@ -47,9 +44,16 @@ async def _run_failure_detector(net, membership):
 
 async def _init(loop):
     transport, net = await loop.create_datagram_endpoint(LocalProtocol, local_addr=('127.0.0.1', 9999))
-    def on_ping(net, addr):
+    def on_ping(net, addr, data):
         seq = 0  # TODO
         net.transport.sendto(json.dumps({'type': 'ack', 'seq': seq}).encode(), addr)
+    def on_ping_request(net, addr, target, data):
+        seq = 0  # TODO
+        self.transport.sendto(json.dumps({'type': 'ping', 'seq': seq}).encode(), target)
+    def on_ack(net, addr, data):
+        seq = 0  # TODO
+        # must decide if this is ack from ping or ping-req
+        print('ack received')
     net.on_ping = on_ping
     membership = Membership()
     asyncio.ensure_future(_run_disseminator(net, membership))
